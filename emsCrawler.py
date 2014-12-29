@@ -131,6 +131,7 @@ class ProducerThread(Thread):
             #print "Produced", rst
             time.sleep(random.random())
             queue.put(None)
+            print 'producer is over'
             break
 
 
