@@ -31,6 +31,8 @@ class Crawler:
 
     def crawl(self, waybilllist):
 
+        list_crawl_rst =[]
+
         # for index, cookie in enumerate(cj):
             # print '[',index, ']',cookie;
 
@@ -81,10 +83,12 @@ class Crawler:
 
             for multiresult in exp_text.findall(fmain):
                 for singresult in exp_li.findall(multiresult):
+                    strrst = ''
                     for num in exp_num.findall(singresult):
                         num_str = num.strip()
-                        print '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
-                        print num_str[0:13]
+                        #print '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
+                        #print num_str[0:13]
+                        strrst += num_str[0:13]
                         break
                     for restable in exp0.findall(singresult):
                         # print restable
@@ -94,49 +98,48 @@ class Crawler:
                                 headflag = 0
                                 continue
                             else:
-                                print '==============='
+                                #print '==============='
+                                strtbl = ""
                                 for col in exp2.findall(row):
-                                    print col.replace('&nbsp;', ' ').strip()
+                                    #print col.replace('&nbsp;', ' ').strip()
+                                    strtbl = "##".join([strtbl,col.replace('&nbsp;', ' ').strip()])
+
+                                strrst = " ".join([strrst, strtbl])
+                        list_crawl_rst.append(strrst)
         else:
             print "error"
+        #print list_crawl_rst
+        return list_crawl_rst
 
 
 class ProducerThread(Thread):
     def run(self):
-        nums = range(5)
         global queue
+        ems_crawler = Crawler(cg.codemask)
         while True:
-            num = random.choice(nums)
-            queue.put(num)
-            print "Produced", num
+            waybilllist = ['5032982334103', '1234567890121']
+            rst = ems_crawler.crawl(waybilllist)
+            queue.put(rst)
+            #print "Produced", rst
             time.sleep(random.random())
+            break
 
 
 class ConsumerThread(Thread):
     def run(self):
         global queue
         while True:
-            num = queue.get()
+            rst = queue.get()
             queue.task_done()
-            print "Consumed", num
+            print "Consumed", rst
             time.sleep(random.random())
+            break
 
 
 
 if __name__ == '__main__':
-    ems_crawler = Crawler(cg.codemask)
 
     ProducerThread().start()
-
     ConsumerThread().start()
 
 
-    waybilllist = ['5032982334103', '1234567890121']
-    ems_crawler.crawl(waybilllist)
-
-    waybilllist = ['1234567890125', '1234567890126']
-    ems_crawler.crawl(waybilllist)
-    waybilllist = ['1234567890123', '1234567890128']
-    ems_crawler.crawl(waybilllist)
-    waybilllist = ['1234567890122', '1234567890124']
-    ems_crawler.crawl(waybilllist)
