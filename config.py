@@ -1,6 +1,11 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+__author__ = 'qmax'
+
 from PIL import Image
 import os
-__author__ = 'qmax'
+
 
 
 # url for crawlering

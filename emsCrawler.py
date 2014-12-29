@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 __author__ = 'qmax'
 
 import sys
@@ -16,6 +19,7 @@ import random
 from Queue import Queue
 
 queue = Queue(10)
+
 
 
 class Crawler:
@@ -88,7 +92,6 @@ class Crawler:
                         num_str = num.strip()
                         #print '$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$'
                         #print num_str[0:13]
-                        strrst += num_str[0:13]
                         break
                     for restable in exp0.findall(singresult):
                         # print restable
@@ -104,8 +107,8 @@ class Crawler:
                                     #print col.replace('&nbsp;', ' ').strip()
                                     strtbl = "##".join([strtbl,col.replace('&nbsp;', ' ').strip()])
 
-                                strrst = " ".join([strrst, strtbl])
-                        list_crawl_rst.append(strrst)
+                                strrst = "".join([num_str[0:13], strtbl])
+                            list_crawl_rst.append(strrst)
         else:
             print "error"
         #print list_crawl_rst
@@ -117,11 +120,17 @@ class ProducerThread(Thread):
         global queue
         ems_crawler = Crawler(cg.codemask)
         while True:
-            waybilllist = ['5032982334103', '1234567890121']
+            waybilllist = ['1234567890125', '1234567890129']
+            rst = ems_crawler.crawl(waybilllist)
+            queue.put(rst)
+            #print "Produced", rst
+            time.sleep(2)
+            waybilllist = ['5032982334103', '1234567890123']
             rst = ems_crawler.crawl(waybilllist)
             queue.put(rst)
             #print "Produced", rst
             time.sleep(random.random())
+            queue.put(None)
             break
 
 
@@ -130,10 +139,16 @@ class ConsumerThread(Thread):
         global queue
         while True:
             rst = queue.get()
-            queue.task_done()
-            print "Consumed", rst
-            time.sleep(random.random())
-            break
+            if rst is None:
+                print 'task is over'
+                break
+            else:
+                queue.task_done()
+                for waybill in rst:
+                    print waybill.split('##')
+                #print "Consumed", rst
+                time.sleep(random.random())
+
 
 
 
