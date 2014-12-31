@@ -18,8 +18,9 @@ import time
 import random
 from Queue import Queue
 
-queue = Queue(10)
+import orm
 
+queue = Queue(10)
 
 
 class Crawler:
@@ -43,7 +44,7 @@ class Crawler:
         rand_url = cg.ems_rand_code_url
         request = urllib2.Request(rand_url)
 
-        f = self.opener.open(request)
+        f = self.opener.open(request, timeout=10)
 
         # content =  f.read()
 
@@ -60,7 +61,7 @@ class Crawler:
         # print crackcode
 
         multinum = ''
-        for i in xrange(len(waybilllist) ):
+        for i in xrange(len(waybilllist)):
             multinum = "\n".join([multinum, waybilllist[i]])
 
         data = {'checkCode': str(crackcode), 'muMailNum':  multinum }
@@ -70,7 +71,7 @@ class Crawler:
                 data=urllib.urlencode(data)
         )
 
-        f = self.opener.open(request)
+        f = self.opener.open(request, timeout=10)
 
         fmain = f.read()
 
@@ -111,44 +112,75 @@ class Crawler:
                             list_crawl_rst.append(strrst)
         else:
             print "error"
-        #print list_crawl_rst
+        # print list_crawl_rst
         return list_crawl_rst
+
+# EA218826786HK
+# EE726578183TW
+def genWaybillchk(numstr):
+    assert len(numstr) == 8
+    sumproduct = 0
+    prd = [8, 6, 4, 2, 3, 5, 9, 7]
+    for i in xrange(8):
+        sumproduct += int(numstr[i]) * prd[i]
+    sumproduct %= 11
+    sumproduct = 11 - sumproduct
+
+    if sumproduct == 10 :
+        sumproduct = 0
+    else:
+        if sumproduct == 11:
+            sumproduct = 5
+    return numstr + str(sumproduct)
+
+
+def genWaybill(seednum,num):
+    for i in xrange(num):
+        yield 'EE' + genWaybillchk(str(seednum + i )) + 'TW'
 
 
 class ProducerThread(Thread):
     def run(self):
         global queue
         ems_crawler = Crawler(cg.codemask)
+        crawnum = genWaybill(72657710, 100)
         while True:
-            waybilllist = ['1234567890125', '1234567890129']
+            waybilllist = []
+            for i in range(10):
+                try:
+                    waybilllist.append(crawnum.next())
+                except(GeneratorExit, StopIteration):
+                    rst = ems_crawler.crawl(waybilllist)
+                    queue.put(rst)
+                    queue.put(None)
+                    print 'producer is over'
+                    return
             rst = ems_crawler.crawl(waybilllist)
             queue.put(rst)
-            #print "Produced", rst
-            time.sleep(2)
-            waybilllist = ['5032982334103', '1234567890123']
-            rst = ems_crawler.crawl(waybilllist)
-            queue.put(rst)
-            #print "Produced", rst
+            # print "Produced", rst
             time.sleep(random.random())
-            queue.put(None)
-            print 'producer is over'
-            break
 
 
 class ConsumerThread(Thread):
     def run(self):
+        ret = orm.db_stuff()
+
         global queue
         while True:
             rst = queue.get()
             if rst is None:
                 print 'task is over'
-                break
+                return
             else:
                 queue.task_done()
                 for waybill in rst:
-                    print waybill.split('##')
-                #print "Consumed", rst
-                time.sleep(random.random())
+                    temp = waybill.split('##')
+
+                    i = ret.insert()
+                    i.execute(crawtype='ems', waybillno=temp[0], input_tm=temp[1],description=unicode(temp[2] + temp[3]))
+
+                # print "Consumed", rst
+                time.sleep(1)
 
 
 
