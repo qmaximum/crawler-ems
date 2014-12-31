@@ -20,7 +20,7 @@ from Queue import Queue
 
 import orm
 
-queue = Queue(10)
+queue = Queue(20)
 
 
 class Crawler:
@@ -118,11 +118,13 @@ class Crawler:
 # EA218826786HK
 # EE726578183TW
 def genWaybillchk(numstr):
-    assert len(numstr) == 8
+    #assert len(numstr) == 8
+    length = len(numstr)
+    offset = 8 - length
     sumproduct = 0
     prd = [8, 6, 4, 2, 3, 5, 9, 7]
-    for i in xrange(8):
-        sumproduct += int(numstr[i]) * prd[i]
+    for i in xrange(length):
+        sumproduct += int(numstr[i]) * prd[i + offset]
     sumproduct %= 11
     sumproduct = 11 - sumproduct
 
@@ -136,14 +138,17 @@ def genWaybillchk(numstr):
 
 def genWaybill(seednum,num):
     for i in xrange(num):
-        yield 'EE' + genWaybillchk(str(seednum + i )) + 'TW'
+        waybillno = genWaybillchk(str(seednum + i ))
+        if len(waybillno) < 9:
+            waybillno = '0' * (9 - len(waybillno) ) + waybillno
+        yield 'EJ' + waybillno + 'JP'
 
 
 class ProducerThread(Thread):
     def run(self):
         global queue
         ems_crawler = Crawler(cg.codemask)
-        crawnum = genWaybill(72657710, 100)
+        crawnum = genWaybill(3512222, 100)
         while True:
             waybilllist = []
             for i in range(10):
@@ -177,7 +182,11 @@ class ConsumerThread(Thread):
                     temp = waybill.split('##')
 
                     i = ret.insert()
-                    i.execute(crawtype='ems', waybillno=temp[0], input_tm=temp[1],description=unicode(temp[2] + temp[3]))
+                    if len(temp[1]) < 1:
+                        continue
+                    else:
+                        i.execute(crawtype='ems', waybillno=temp[0], input_tm=temp[1],
+                              description=unicode(temp[2] + temp[3]))
 
                 # print "Consumed", rst
                 time.sleep(1)
