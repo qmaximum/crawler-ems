@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 
 def db_stuff():
-	engine = create_engine('sqlite:///./db.example', echo=True)
+	engine = create_engine('sqlite:///./src/src/db.example', echo=True)
 	metadata = MetaData(engine)
 	db = Table('test', metadata, autoload=True)
 	return db
