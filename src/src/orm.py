@@ -11,6 +11,7 @@ def db_stuff():
 	engine = create_engine('sqlite:///./src/src/db.example', echo=True)
 	metadata = MetaData(engine)
 	db = Table('test', metadata, autoload=True)
-	return db
+	conn = engine.connect()
+	return conn, db
 
 

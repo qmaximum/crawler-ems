@@ -168,25 +168,32 @@ class ProducerThread(Thread):
 
 class ConsumerThread(Thread):
     def run(self):
-        ret = orm.db_stuff()
+        conn = orm.db_stuff()
+        con = conn[0]
+        users = conn[1]
 
         global queue
         while True:
             rst = queue.get()
             if rst is None:
+                con.close()
                 print 'task is over'
                 return
             else:
                 queue.task_done()
-                for waybill in rst:
-                    temp = waybill.split('##')
+                with con.begin() as trans:
+                    for waybill in rst:
 
-                    i = ret.insert()
-                    if len(temp[1]) < 1:
-                        continue
-                    else:
-                        i.execute(crawtype='ems', waybillno=temp[0], input_tm=temp[1],
-                              description=unicode(temp[2] + temp[3]))
+                        temp = waybill.split('##')
+
+                        if len(temp[1]) < 1:
+                            continue
+                        else:
+                            con.execute(users.insert(), crawtype='ems',
+                                        waybillno=temp[0],
+                                        input_tm=temp[1],
+                                        description=unicode(temp[2] + temp[3]))
+
 
                 # print "Consumed", rst
                 time.sleep(1)
