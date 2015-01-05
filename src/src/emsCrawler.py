@@ -6,12 +6,16 @@ __author__ = 'qmax'
 import sys
 import urllib
 import urllib2
+import socket
 import os
 import cookielib
 import re
 import cStringIO
 from codeCrack import CrackOcr
 import config as cg
+
+import logging
+import logging.handlers
 
 from threading import Thread
 import time
@@ -22,6 +26,44 @@ import orm
 
 queue = Queue(20)
 
+LEVELS = {'notset': logging.DEBUG,
+          'debug': logging.DEBUG,
+          'info': logging.INFO,
+          'warning': logging.WARNING,
+          'error': logging.ERROR,
+          'critical': logging.CRITICAL}
+LOG_FILENAME = 'ems-crawl.out'
+LOG_BACKUPCOUNT = 5
+LOG_LEVEL = 'notset'
+
+
+def catch_exception(exception=Exception, logger=logging.getLogger('Producer')):
+    def deco(func):
+        def wrapper(*args, **kwargs):
+            try:
+                result = func(*args, **kwargs)
+            except exception as err:
+                logger.exception(err)
+            else:
+                return result
+        return wrapper
+    return deco
+
+def InitLog(logger):
+
+    # Add the log message handler to the logger
+    handler = logging.handlers.RotatingFileHandler(LOG_FILENAME, maxBytes=20*1024*1024, backupCount=LOG_BACKUPCOUNT)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(LEVELS.get(LOG_LEVEL.lower()))
+
+    return logger
+
+
+class MyException(Exception):
+    pass
+
 
 class Crawler:
 
@@ -31,10 +73,11 @@ class Crawler:
         cj = cookielib.CookieJar()
         self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
         urllib2.install_opener(self.opener)
-        resp = urllib2.urlopen(url)
+        resp = urllib2.urlopen(url, timeout=10)
         self.crack = CrackOcr(self.codemask)
 
-    def crawl(self, waybilllist):
+    @catch_exception()
+    def crawl(self, waybilllist, ntries=3):
 
         list_crawl_rst =[]
 
@@ -44,7 +87,19 @@ class Crawler:
         rand_url = cg.ems_rand_code_url
         request = urllib2.Request(rand_url)
 
-        f = self.opener.open(request, timeout=10)
+        # retry ntries when timeout occur
+        assert ntries >= 1
+        for _ in range(ntries):
+            try:
+                if _ > 0:
+                    time.sleep(2)
+                f = self.opener.open(request, timeout=10)
+                break # success
+            except urllib2.URLError as err:
+                if not isinstance(err.reason, socket.timeout):
+                   raise # propagate non-timeout errors
+        else: # all ntries failed
+            raise err # re-raise the last timeout error
 
         # content =  f.read()
 
@@ -67,11 +122,22 @@ class Crawler:
         data = {'checkCode': str(crackcode), 'muMailNum':  multinum }
 
         request = urllib2.Request(
-                url=cg.ems_multiquery_url,
-                data=urllib.urlencode(data)
+            url=cg.ems_multiquery_url,
+            data=urllib.urlencode(data)
         )
 
-        f = self.opener.open(request, timeout=10)
+        assert ntries >= 1
+        for _ in range(ntries):
+            try:
+                if _ > 0:
+                    time.sleep(2)
+                f = self.opener.open(request, timeout=10)
+                break # success
+            except urllib2.URLError as err:
+                if not isinstance(err.reason, socket.timeout):
+                   raise # propagate non-timeout errors
+        else: # all ntries failed
+            raise err # re-raise the last timeout error
 
         fmain = f.read()
 
@@ -106,7 +172,7 @@ class Crawler:
                                 strtbl = ""
                                 for col in exp2.findall(row):
                                     #print col.replace('&nbsp;', ' ').strip()
-                                    strtbl = "##".join([strtbl,col.replace('&nbsp;', ' ').strip()])
+                                    strtbl = "##".join([strtbl, col.replace('&nbsp;', ' ').strip()])
 
                                 strrst = "".join([num_str[0:13], strtbl])
                             list_crawl_rst.append(strrst)
@@ -118,7 +184,7 @@ class Crawler:
 # EA218826786HK
 # EE726578183TW
 def genWaybillchk(numstr):
-    #assert len(numstr) == 8
+    assert len(numstr) <= 8, 'invalid length of waybillno !'
     length = len(numstr)
     offset = 8 - length
     sumproduct = 0
@@ -128,7 +194,7 @@ def genWaybillchk(numstr):
     sumproduct %= 11
     sumproduct = 11 - sumproduct
 
-    if sumproduct == 10 :
+    if sumproduct == 10:
         sumproduct = 0
     else:
         if sumproduct == 11:
@@ -145,28 +211,42 @@ def genWaybill(seednum,num):
 
 
 class ProducerThread(Thread):
+    def __init__(self):
+        Thread.__init__(self, name='Producer')
+        logger = logging.getLogger('Producer')
+        self.logger = InitLog(logger)
+
     def run(self):
         global queue
         ems_crawler = Crawler(cg.codemask)
-        crawnum = genWaybill(3512222, 100)
+        crawnum = genWaybill(3512280, 103)
         while True:
             waybilllist = []
             for i in range(10):
                 try:
                     waybilllist.append(crawnum.next())
                 except(GeneratorExit, StopIteration):
+                    self.logger.info(":".join([str(waybilllist[0]), str(waybilllist[-1])]))
                     rst = ems_crawler.crawl(waybilllist)
                     queue.put(rst)
+                    self.logger.debug('None is add')
                     queue.put(None)
-                    print 'producer is over'
+                    self.logger.info('producer is over')
                     return
+
+            self.logger.info(":".join([str(waybilllist[0]), str(waybilllist[-1])]))
             rst = ems_crawler.crawl(waybilllist)
             queue.put(rst)
             # print "Produced", rst
-            time.sleep(random.random())
+            time.sleep(random.random() * 2)
 
 
 class ConsumerThread(Thread):
+    def __init__(self):
+        Thread.__init__(self, name='Consumer')
+        logger = logging.getLogger('Consumer')
+        self.logger = InitLog(logger)
+
     def run(self):
         conn = orm.db_stuff()
         con = conn[0]
@@ -177,7 +257,7 @@ class ConsumerThread(Thread):
             rst = queue.get()
             if rst is None:
                 con.close()
-                print 'task is over'
+                self.logger.info('task is over')
                 return
             else:
                 queue.task_done()
@@ -194,16 +274,18 @@ class ConsumerThread(Thread):
                                         input_tm=temp[1],
                                         description=unicode(temp[2] + temp[3]))
 
-
-                # print "Consumed", rst
+                self.logger.debug('write one batch')
                 time.sleep(1)
-
-
 
 
 if __name__ == '__main__':
 
     ProducerThread().start()
     ConsumerThread().start()
+
+
+
+
+
 
 
