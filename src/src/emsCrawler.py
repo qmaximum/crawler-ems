@@ -230,6 +230,9 @@ class ProducerThread(Thread):
             self.seedbills.append(row[1])
         con.close()
 
+        if len(self.seedbills) < len(cg.seedbillno):
+            self.seedbills = cg.seedbillno
+
     def run(self):
         global queue
         ems_crawler = Crawler(cg.codemask)
