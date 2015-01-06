@@ -14,6 +14,14 @@ ems_multiquery_url = 'http://www.ems.com.cn/ems/order/multiQuery_t'
 ems_rand_code_url = 'http://www.ems.com.cn/ems/rand.png'
 crack_folder = '../src/src/codemap'
 
+# crawl how much waybillno every time
+crawlnum = 100
+
+# waybillno for diff destination
+seedbillno = ['EA218826786HK', 'EE726578197TW', 'EJ035123212JP']
+seedbillstr = "select substr(waybillno,12,2) as type,max(waybillno) from test group by substr(waybillno,12,2)"
+
+
 # code for extracting from html
 exp_text_pattern = "(?isu)<ul\s+?class=\"mailnum_result_list_box\"[^>]*>(.*?)</ul>"
 exp_li_pattern = "(?isu)<li style=\"cursor: pointer;\"[^>]*>(.*?)</li>"

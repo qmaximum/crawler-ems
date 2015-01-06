@@ -34,7 +34,7 @@ LEVELS = {'notset': logging.DEBUG,
           'critical': logging.CRITICAL}
 LOG_FILENAME = 'ems-crawl.out'
 LOG_BACKUPCOUNT = 5
-LOG_LEVEL = 'notset'
+LOG_LEVEL = 'info'
 
 
 def catch_exception(exception=Exception, logger=logging.getLogger('Producer')):
@@ -202,12 +202,16 @@ def genWaybillchk(numstr):
     return numstr + str(sumproduct)
 
 
-def genWaybill(seednum,num):
-    for i in xrange(num):
-        waybillno = genWaybillchk(str(seednum + i ))
-        if len(waybillno) < 9:
-            waybillno = '0' * (9 - len(waybillno) ) + waybillno
-        yield 'EJ' + waybillno + 'JP'
+def genWaybill(seedbills,num):
+    for no in seedbills:
+        preno = no[0:2]
+        affno = no[11:13]
+        seednum = int(no[2:10])
+        for i in xrange(num):
+            waybillno = genWaybillchk(str(seednum + i))
+            if len(waybillno) < 9:
+                waybillno = '0' * (9 - len(waybillno) ) + waybillno
+            yield preno + waybillno + affno
 
 
 class ProducerThread(Thread):
@@ -215,20 +219,31 @@ class ProducerThread(Thread):
         Thread.__init__(self, name='Producer')
         logger = logging.getLogger('Producer')
         self.logger = InitLog(logger)
+        self.seedbills = []
+
+        conn = orm.db_stuff()
+        con = conn[0]
+
+        result = con.execute(cg.seedbillstr)
+
+        for row in result:
+            self.seedbills.append(row[1])
+        con.close()
 
     def run(self):
         global queue
         ems_crawler = Crawler(cg.codemask)
-        crawnum = genWaybill(3512280, 103)
+        crawnum = genWaybill(self.seedbills, cg.crawlnum)
         while True:
             waybilllist = []
             for i in range(10):
                 try:
                     waybilllist.append(crawnum.next())
                 except(GeneratorExit, StopIteration):
-                    self.logger.info(":".join([str(waybilllist[0]), str(waybilllist[-1])]))
-                    rst = ems_crawler.crawl(waybilllist)
-                    queue.put(rst)
+                    if len(waybilllist) > 0:
+                        self.logger.info(":".join([str(waybilllist[0]), str(waybilllist[-1])]))
+                        rst = ems_crawler.crawl(waybilllist)
+                        queue.put(rst)
                     self.logger.debug('None is add')
                     queue.put(None)
                     self.logger.info('producer is over')
