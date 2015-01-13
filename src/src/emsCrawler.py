@@ -34,7 +34,7 @@ LEVELS = {'notset': logging.DEBUG,
           'critical': logging.CRITICAL}
 LOG_FILENAME = 'ems-crawl.out'
 LOG_BACKUPCOUNT = 5
-LOG_LEVEL = 'info'
+LOG_LEVEL = 'debug'
 
 
 def catch_exception(exception=Exception, logger=logging.getLogger('Producer')):
@@ -77,7 +77,7 @@ class Crawler:
         self.crack = CrackOcr(self.codemask)
 
     @catch_exception()
-    def crawl(self, waybilllist, ntries=3):
+    def crawl(self, waybilllist, ntries=10):
 
         list_crawl_rst =[]
 
@@ -92,8 +92,8 @@ class Crawler:
         for _ in range(ntries):
             try:
                 if _ > 0:
-                    time.sleep(2)
-                f = self.opener.open(request, timeout=10)
+                    time.sleep(15)
+                f = self.opener.open(request, timeout=15)
                 break # success
             except urllib2.URLError as err:
                 if not isinstance(err.reason, socket.timeout):
@@ -130,8 +130,8 @@ class Crawler:
         for _ in range(ntries):
             try:
                 if _ > 0:
-                    time.sleep(2)
-                f = self.opener.open(request, timeout=10)
+                    time.sleep(15)
+                f = self.opener.open(request, timeout=60)
                 break # success
             except urllib2.URLError as err:
                 if not isinstance(err.reason, socket.timeout):
@@ -232,6 +232,7 @@ class ProducerThread(Thread):
 
         if len(self.seedbills) < len(cg.seedbillno):
             self.seedbills = cg.seedbillno
+        # self.seedbills = cg.seedbillno
 
     def run(self):
         global queue
@@ -254,8 +255,11 @@ class ProducerThread(Thread):
 
             self.logger.info(":".join([str(waybilllist[0]), str(waybilllist[-1])]))
             rst = ems_crawler.crawl(waybilllist)
-            queue.put(rst)
-            # print "Produced", rst
+            if rst is None:
+                self.logger.debug('Result is none')
+                pass
+            else:
+                queue.put(rst)
             time.sleep(random.random() * 2)
 
 

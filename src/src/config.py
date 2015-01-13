@@ -15,10 +15,11 @@ ems_rand_code_url = 'http://www.ems.com.cn/ems/rand.png'
 crack_folder = '../src/src/codemap'
 
 # crawl how much waybillno every time
-crawlnum = 100
+crawlnum = 3000
 
 # waybillno for diff destination
 seedbillno = ['EA218826786HK', 'EE726578197TW', 'EJ035123212JP']
+#seedbillno = [   '1172159897703']
 seedbillstr = "select substr(waybillno,12,2) as type,max(waybillno) from test group by substr(waybillno,12,2)"
 
 
