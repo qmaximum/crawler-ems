@@ -215,10 +215,9 @@ def genWaybill(seedbills,num):
 
 
 class ProducerThread(Thread):
-    def __init__(self):
+    def __init__(self, plogger):
         Thread.__init__(self, name='Producer')
-        logger = logging.getLogger('Producer')
-        self.logger = InitLog(logger)
+        self.logger = plogger
         self.seedbills = []
 
         conn = orm.db_stuff()
@@ -264,10 +263,10 @@ class ProducerThread(Thread):
 
 
 class ConsumerThread(Thread):
-    def __init__(self):
+    def __init__(self, clogger):
         Thread.__init__(self, name='Consumer')
-        logger = logging.getLogger('Consumer')
-        self.logger = InitLog(logger)
+        self.logger = clogger
+
 
     def run(self):
         conn = orm.db_stuff()
@@ -302,8 +301,31 @@ class ConsumerThread(Thread):
 
 if __name__ == '__main__':
 
-    ProducerThread().start()
-    ConsumerThread().start()
+    #ProducerThread().start()
+    #ConsumerThread().start()
+
+    logger = logging.getLogger('Admin')
+    logger = InitLog(logger)
+
+    prd_logger = logging.getLogger('Producer')
+    prd_logger = InitLog(prd_logger)
+
+    con_logger = logging.getLogger('Consumer')
+    con_logger = InitLog(con_logger)
+
+    while True:
+        logger.info('New Task Begin')
+        threads = []
+        # 创建线程对象
+        threads.append(ProducerThread(prd_logger))
+        threads.append(ConsumerThread(con_logger))
+        # 启动线程
+        for t in threads:
+            t.start()
+        # 等待子线程结束
+        for t in threads:
+            t.join()
+        time.sleep(36000)
 
 
 
